@@ -4,12 +4,12 @@ The file structure goes as follows:
 
 ## Header
 ```c
-// Size: 4+1+3+2+8+4+3+4+4+4=37 bytes
 struct cafe_header {
   // Headers marked with "!" are considered to be critical fields and
-  // will affect the decoding if not properly written
-  // Headers marked with "#" are not considered in the decoding process.
-  char identifier[4];                 // Magic bytes "CAfE" 
+  // will affect the decoding process if not properly written.
+  // Headers marked with "#" are not important in the decoding process
+  // and can have arbritary data.
+  char file_identifier[4];            // Magic bytes "CAfE" 
   char data_type[1];                  //! Type of data in file ("A"udio, "D"ata)
   struct version_identifier {         //! Version identifier, useful for compatibility checking
   uint8_t major_version;              // Major version
@@ -17,14 +17,16 @@ struct cafe_header {
   uint8_t patch_no;                   // Major version
   };
   uint16_t global_params;             //! Used to describe how to interpret the file
+  uint8_t num_channels;               //! Number of channels
   struct file_meta {                  // File metadata.
+  char meta_begin[4];                 //! Byte identifier "META"
   uint64_t dateModified;              //# When the file was last modified
-  uint32_t noOfInstructions;          //# Number of instructions the file uses
-  uint24_t noOfRawdiffInstructions;   //# Number of times the file uses raw diffed data (see instruction-set.md for details on rawdiff)
   uint32_t sampleRate;                //! Custom sample rate, if the below presets are not applicable. Set as 0x00000000 if not used.
   };
   char data_begin[4];                 //! Byte identifier "DATA"
-  uint32_t data_cksum;                //! CRC32 checksum, for corruption prevention
+  char chan_begin[2];                 //! Byte identifier "CH"
+  char chan_id;                       //! Channel ID
+  uint32_t chan_data_cksum;           //! CRC32 checksum, for corruption prevention
   // data follows...
 };
 ```
@@ -62,7 +64,7 @@ The `global_params` header defines many parsing parameters, such as how will the
 | 1111 | Defined in `file_meta->sampleRate` |
 
 ## Header: Compression strategies
-Compression will affect the data portion of the file. The CRC32 checksum is calculated after compression.
+Each channel in the file is compressed seperately. The CRC32 checksum is calculated after compression.
 
 | Bits | Description |
 |------|-------------|
@@ -87,8 +89,13 @@ The footer structure is as follows:
 ```c
 // Size: 4+4+4=12 bytes (not including extra_meta_contents)
 struct cafe_footer {
-  char data_end[4];             // Identifier "DEND"
-  uint32_t sz_extra_meta;       // Size of extra metadata (ID3 tags or XMP data)
+  // Headers marked with "!" are considered to be critical fields and
+  // will affect the decoding if not properly written, if used.
+  // Headers marked with "#" are not considered in the decoding process
+  // and can have arbritary data so long as it fits.
+  char data_end[4];             //! Identifier "DEND"
+  // if another channel
+  uint64_t sz_extra_meta;       // Size of extra metadata
   char type_of_meta;            // Type of extra metadata (0x01: ID3, 0x02: XMP, 0x03: Both, 0x04: Other)
   char extra_meta_contents[];   // Extra metadata
   char file_end[4];             // Identifier "EOF\xFF"
