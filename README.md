@@ -12,5 +12,9 @@ I am aware that this is not the best way to encode audio since you need to use m
 - Encode waveforms using the least amounts of bytes possible.
 - Create an Assembly-like language that can generate valid files from text-based source code files (probably stupid).
 
+## Folders
+- docs/full - Full documentation.
+- docs/version-0 - Where the current reference implentation is based on, the same but without some instructions and header fields. Appended to docs/full after approval.
+
 ## Conclusion
 This is not the best way to encode audio data (as many others also have talked about [here](docs/attempts.md)). Therefore, this is considered "cromulent" or totally acceptable.

@@ -16,7 +16,7 @@ Here are some proposed instructions:
 
 > Notes:
 >
-> * `BIT_DEPTH_DEPENDANT` - depends on the bit depth requested be the header.
+> * `BIT_DEPTH_DEPENDANT` - depends on the bit depth requested be the header. (i.e. if header specifies a 32-bit "sandbox", the argument is also 32-bit)
 > * `ufloat8` - 8-bit unsigned floating point number.
 > * `float16[numControlPoints]` - a `float16` array with exactly the length specified in `numControlPoints`.
 > * `bfloat16` - FP32 with it's mantissa truncated to 7 bits.
