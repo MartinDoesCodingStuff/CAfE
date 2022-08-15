@@ -1,7 +1,7 @@
 
 //#region Writing functions
 // functions to convert numbers to a little-endian Uint8Array (char[])
-// Here to avoid having to compensate for client endianness
+// These functions exist in order to avoid having to compensate for client endianness
 /**
  * @param {number} a
  */
@@ -68,13 +68,6 @@ function makeCRCTable() { for (var a, d = [], b = 0; 256 > b; b++) { a = b; for 
 var cafe_internal_CRCtable = makeCRCTable();
 /**@param {number[]|Uint8Array} a */
 function crc32(a) { for (var d = cafe_internal_CRCtable, b = -1, c = 0; c < a.length; c++)b = b >>> 8 ^ d[(b ^ a[c]) & 255]; return (b ^ -1) >>> 0; }
-
-/**
- * From: https://github.com/NeoCat/FSK-Serial-Generator-in-JavaScript/blob/master/fsk-gen.html
- * Also passed through closure compiler
- * @param {string} e
- */
- function toUTF8(e){for(var b=[],d=0;d<e.length;d++){var a=e.charCodeAt(d);if(127>=a)b.push(a);else if(2047>=a)b.push(192|a>>>6),b.push(128|a&63);else if(65535>=a)b.push(224|a>>>12),b.push(128|a>>>6&63),b.push(128|a&63);else{for(var c=4;a>>>6*c;)c++;for(b.push(65280>>>c&255|a>>>6*--c);c--;)b[idx++]=128|a>>>6*c&63}}return b};
 
 //#region Reading functions
 

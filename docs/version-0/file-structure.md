@@ -6,26 +6,26 @@ The file structure goes as follows:
 
 ## Header
 ```c
+// Size: 4+1+3+2+4+8+4+4=30 bytes
 struct cafe_header {
   // Headers marked with "!" are considered to be critical fields and
   // will affect the decoding if not properly written, if used.
   // Headers marked with "#" are not considered in the decoding process
   // and can have arbritary data so long as it fits.
-  char file_identifier[4];            //  Magic bytes "CAfE" 
-  char data_type[1];                  //! Type of data in file ("A"udio, "D"ata)
-  struct version_identifier {         //! Version identifier, useful for compatibility checking
-  uint8_t major_version;              //  Major version
-  uint8_t minor_version;              //  Major version
-  uint8_t patch_no;                   //  Major version
+  char file_identifier[4];             //! Magic bytes "CAfE" 
+  char data_type[1];                   //! Type of data in file ("A"udio)
+  struct version_identifier {          //! Version identifier, useful for compatibility checking
+  uint8_t major_version;               //  Major version
+  uint8_t minor_version;               //  Minor version
+  uint8_t patch_no;                    //  Patch identifier
   };
-  uint16_t global_params;             //! Used to describe how to interpret the file
-  uint8_t num_channels;               //! Number of channels
-  struct file_meta {                  //  File metadata.
-  char meta_begin_tag[4];             //! Byte identifier "META"
-  uint64_t dateModified;              //# When the file was last modified
-  uint32_t sampleRate;                //! Custom sample rate, if the below presets are not applicable.
+  uint16_t global_params;              //! Used to describe how to interpret the file
+  struct file_meta {                   //  File metadata.
+  char meta_begin_tag[4];              //! Byte identifier "META"
+  uint64_t dateModified;               //# When the file was last modified
+  uint32_t sampleRate;                 //! Custom sample rate, if the below presets are not applicable.
   };
-  char data_begin_tag[4];             //! Byte identifier "DATA"
+  char data_begin_tag[4];              //! Byte identifier "DATA"
 };
 ```
 ## Header: `data_type`
@@ -33,20 +33,18 @@ This tells the decoder what type of file is it dealing with. Here is a table lis
 | Character |                 Description                |
 |-----------|--------------------------------------------|
 |     A     |   File will be interpreted as audio data   |
-|     D     |  File will be interpreted as regular data  |
-<!-- |     I     | File will be interpreted as image data (not yet worked out) | -->
 
 
 ## Header: `global_params`
 The `global_params` header defines many parsing parameters, such as how will the decoder interpret the instructions, what sample rate it uses, etc.
 
-| Index | Size |     Name     | Description | Valid Values |
+| Bit Index | Size (bits) |     Name     | Description | Valid Values |
 |-------|------|--------------|-------------|--------------|
-|   0   |  4   |  SAMPLE_RATE | The encoded data's sample rate | See [Valid Sample Rates](#header-valid-sample-rates) |
-|   4   |  2   | COMPRESSION_STRAT | Compression strategy of the data | See [Compression Strategies](#header-compression-strategies) |
-|   6   |  3   |  BIT_DEPTH   | The required bit depth | See [Bit Depth](#header-bit-depth) |
-|   10  |  1   | HAVE_EXTRA_META | Has extra metadata at the end of file | `0: false, 1: true` |
-|   11  |  4   | reserved | Reserved for future revisions |
+|   0   |  4   |  SAMPLE_RATE | The encoded data's sample rate. | See [Valid Sample Rates](#header-valid-sample-rates) |
+|   4   |  2   | COMPRESSION_STRAT | Compression strategy of the data. | See [Compression Strategies](#header-compression-strategies) |
+|   6   |  3   |  BIT_DEPTH   | The required bit depth. | See [Bit Depth](#header-bit-depth) |
+|   10  |  1   | HAVE_EXTRA_META | Has extra metadata at the end of file. | `0: false, 1: true` |
+|   11  |  4   | NUM_CHANNELS | Number of channels the file contains, with channel 1 being indexed as 0. |
 
 
 ## Header: Valid Sample Rates
@@ -63,14 +61,16 @@ The `global_params` header defines many parsing parameters, such as how will the
 | 1111 | Defined in `file_meta->sampleRate` |
 
 ## Header: Compression strategies
-Each channel in the file is compressed seperately. The CRC32 checksum is calculated after compression.
+Each chunk in the file is compressed seperately. The CRC32 checksum covers the all of the data between `DATA` and `DEND` is calculated.
 
-| Bits | Description |
-|------|-------------|
-|  00  | No compression |
-|  01  | LZSS (uses 2048 byte window with a 16 byte lookahead buffer) |
-|  10  | Enhanced LZSS (uses 65536 byte window with a 256 byte lookahead buffer) |
-|  11  | DEFLATE |
+| Bits | Name | Description |
+|------|------|-------------|
+| 0000 | `none` | No compression |
+| 0001 | `lzss1k` | LZSS using a 1024 byte window with a 64 byte lookahead buffer |
+| 0010 | `lzss2k` | LZSS using a 2048 byte window with a 256 byte lookahead buffer |
+| 0011 | `lzss32k` | LZSS using a 32767 byte window with a 256 byte lookahead buffer |
+| 0100 | `deflate` | DEFLATE |
+| 0110...1111 | reserved | Reserved (default to `none`) |
 
 ## Header: Bit Depth
 | Bits | Description |
@@ -85,41 +85,51 @@ Each channel in the file is compressed seperately. The CRC32 checksum is calcula
 
 ## Data section
 
+Data encoded in this format is chunked for performance and reliability purposes. The length of each chunk is variable and is determined by the encoder.
+
 ```c
 struct cafe_data_wrapper {
   // Headers marked with "!" are considered to be critical fields and
   // will affect the decoding if not properly written, if used.
   // Headers marked with "#" are not considered in the decoding process
   // and can have arbritary data so long as it fits.
-  char chan_begin_tag[2];             //! Byte identifier "CB"
-  uint8_t chan_id;                    //! Channel ID
-  uint32_t chan_data_cksum;           //! CRC32 checksum, as a sanity check. Computed after compression and *ideally* checked before the decoding can start.
-  uint64_t num_instructions;          //! Number of instuctions for the channel
+  char chunk_begin_tag[2];             //! Byte identifier "CB"
+  uint24_t chunk_size;                 //! Size of chunk (size = sum(chan_size) + 5 + 8)
+  uint32_t chunk_index;                //! Index of chunk
+  uint32_t chan_data_cksum;            //! CRC32 checksum, as a sanity check. Computed after compression and *ideally* checked before the decoding can start.
 
-  char data[];                        //! Actual data, compressed or not.
+  struct chan_data {
+    uint8_t chan_id;                   //! Channel ID
+    uint16_t chan_size;                //! Size of data[]
+    char data[];                       //! Data, optionally compressed
+  }
+  // append next channel here
 
-  char chan_end_tag[2];               //! Byte identifier "CE"
-  char null_seperator[1];             //! Byte padding 0x00
-  // attach next channel here.
+  // ...
+  char chunk_end_tag[2];               //! Byte identifier "CE"
+  char null_seperator[1];              //! Byte padding 0x00
+  // append next chunk here.
 };
 
 ```
+
+
 
 <hr>
 
 ## Footer
 ```c
-// Size: 4+8+1+4=17 bytes (not including extra_meta_contents)
+// Size: 4+4+1+5=14 bytes (not including extra_meta_contents)
 struct cafe_footer {
   // Headers marked with "!" are considered to be critical fields and
   // will affect the decoding if not properly written, if used.
   // Headers marked with "#" are not considered in the decoding process
   // and can have arbritary data so long as it fits.
-  char data_end_tag[4];         //! Identifier "DEND"
+  char data_end_tag[4];                //! Identifier "DEND"
   // if another channel
-  uint64_t sz_extra_meta;       // Size of extra metadata
-  char type_of_meta;            // Type of extra metadata (0x00: None, 0x01: ID3, 0x02: XMP, 0x03: Other)
-  char extra_meta_contents[];   // Extra metadata, encoded in UTF-8
-  char file_end[4];             // Identifier "EOF\xFF"
+  uint32_t sz_extra_meta;              // Size of extra metadata
+  char type_of_meta;                   // Type of extra metadata (0x00: None, 0x01: ID3, 0x02: XMP, 0x03: Other)
+  char extra_meta_contents[];          // Extra metadata, encoded in UTF-8
+  char file_end[5];                    // Byte identifier "EOF\xCA\xFE"
 };
 ```
