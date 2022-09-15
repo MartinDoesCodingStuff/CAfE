@@ -1,16 +1,12 @@
 # Instructions
-An instruction is a single character followed by any number of operands, provided the insturuction provides the exact length of it's said operands.
-
- 
-
-Here are some proposed instructions:
+An instruction is a single byte followed by any number of operands. Here are some proposed instructions:
 
 |  Name  | Arguments | Description |
 |--------|-----------|-------------|
 | `noop` |   None    | Do nothing. |
 | `direct` | `to: BIT_DEPTH_DEPENDANT` | directly go to a point in the "sandbox". |
-| `line` | `from: BIT_DEPTH_DEPENDANT, to: BIT_DEPTH_DEPENDANT, numTimes: uint16` | Make a straight line to a specified point. |
-| `rawdiff` | `diff: BIT_DEPTH_DEPENDANT[]` | Encoded as the difference between a previous sample `diff = samps[i] - samps[i + 1]`. |
+| `line` | `from: BIT_DEPTH_DEPENDANT, to: BIT_DEPTH_DEPENDANT, length: int16` | Make a straight line to a specified point. |
+| `rawdiff` | `diff: BIT_DEPTH_DEPENDANT` | Encoded as the difference between a previous sample `diff = samps[i] - samps[i + 1]`. |
 | `hold` | `len: uint24` | Hold the current value for `len` times. |
 
 > Notes:

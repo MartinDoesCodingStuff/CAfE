@@ -6,20 +6,20 @@ The file structure goes as follows:
 
 ## Header
 ```c
-// Size: 4+1+3+2+4+8+4+4=30 bytes
+// Size: 4+3+2+4+4+8+4+4=33 bytes
 struct cafe_header {
   // Headers marked with "!" are considered to be critical fields and
-  // will affect the decoding if not properly written, if used.
+  // will affect the decoding process if not properly written.
   // Headers marked with "#" are not considered in the decoding process
-  // and can have arbritary data so long as it fits.
-  char file_identifier[4];             //! Magic bytes "CAfE" 
-  char data_type[1];                   //! Type of data in file ("A"udio)
+  // and can have arbritary data.
+  char file_identifier[4];             //! Magic bytes "CAfE"
   struct version_identifier {          //! Version identifier, useful for compatibility checking
   uint8_t major_version;               //  Major version
   uint8_t minor_version;               //  Minor version
   uint8_t patch_no;                    //  Patch identifier
   };
   uint16_t global_params;              //! Used to describe how to interpret the file
+  uint32_t num_chunks;                 //! Number of chunks in the file
   struct file_meta {                   //  File metadata.
   char meta_begin_tag[4];              //! Byte identifier "META"
   uint64_t dateModified;               //# When the file was last modified
@@ -28,11 +28,11 @@ struct cafe_header {
   char data_begin_tag[4];              //! Byte identifier "DATA"
 };
 ```
-## Header: `data_type`
-This tells the decoder what type of file is it dealing with. Here is a table listing how it will be interpreted. So far, a decoder would only need to support 
+<!-- ## Header: `data_type`
+This tells the decoder what type of file is it dealing with. Here is a table listing how it will be interpreted. So far, a decoder would only need to support:
 | Character |                 Description                |
 |-----------|--------------------------------------------|
-|     A     |   File will be interpreted as audio data   |
+|     A     |   File will be interpreted as audio data   | -->
 
 
 ## Header: `global_params`
@@ -90,17 +90,18 @@ Data encoded in this format is chunked for performance and reliability purposes.
 ```c
 struct cafe_data_wrapper {
   // Headers marked with "!" are considered to be critical fields and
-  // will affect the decoding if not properly written, if used.
+  // will affect the decoding process if not properly written.
   // Headers marked with "#" are not considered in the decoding process
-  // and can have arbritary data so long as it fits.
+  // and can have arbritary data.
   char chunk_begin_tag[2];             //! Byte identifier "CB"
-  uint24_t chunk_size;                 //! Size of chunk (size = sum(chan_size) + 5 + 8)
+  uint64_t chunk_size;                 //! Size of chunk (size = size of chan_data)
   uint32_t chunk_index;                //! Index of chunk
-  uint32_t chan_data_cksum;            //! CRC32 checksum, as a sanity check. Computed after compression and *ideally* checked before the decoding can start.
+  uint32_t chan_data_cksum;            //! CRC32 checksum of the the entire chan_data part of the file.
 
   struct chan_data {
+    char chan_data_begin[2];           //! Byte identifier "CH"
     uint8_t chan_id;                   //! Channel ID
-    uint16_t chan_size;                //! Size of data[]
+    uint32_t chan_size;                //! Size of data[]
     char data[];                       //! Data, optionally compressed
   }
   // append next channel here
@@ -122,14 +123,14 @@ struct cafe_data_wrapper {
 // Size: 4+4+1+5=14 bytes (not including extra_meta_contents)
 struct cafe_footer {
   // Headers marked with "!" are considered to be critical fields and
-  // will affect the decoding if not properly written, if used.
+  // will affect the decoding process if not properly written.
   // Headers marked with "#" are not considered in the decoding process
-  // and can have arbritary data so long as it fits.
+  // and can have arbritary data.
   char data_end_tag[4];                //! Identifier "DEND"
   // if another channel
-  uint32_t sz_extra_meta;              // Size of extra metadata
-  char type_of_meta;                   // Type of extra metadata (0x00: None, 0x01: ID3, 0x02: XMP, 0x03: Other)
-  char extra_meta_contents[];          // Extra metadata, encoded in UTF-8
+  uint32_t sz_extra_meta;              //! Size of extra metadata
+  char type_of_meta;                   //# Type of extra metadata (0x00: None, 0x01: ID3, 0x02: XMP, 0x03: Other)
+  char extra_meta_contents[];          //# Extra metadata, encoded in UTF-8
   char file_end[5];                    // Byte identifier "EOF\xCA\xFE"
 };
 ```

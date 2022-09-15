@@ -1,4 +1,8 @@
 /**
+ * Does not require any other files.
+ */
+
+/**
  * @param {Object} options
  * @param {number} options.sampleRate
  * @param {"none"|"lzss1k"|"lzss2k"|"lzss32k"|"deflate"} options.compressionStrategy
@@ -9,14 +13,14 @@
 function write_global_params_chunk(options) {
   var out = new Uint8Array(2);
   switch(options.sampleRate) {
-    case 8000: out[0] |= 0b00010000; break;
-    case 16000: out[0] |= 0b00110000; break;
-    case 22050: out[0] |= 0b00110000; break;
-    case 44100: out[0] |= 0b01000000; break;
-    case 48000: out[0] |= 0b00110000; break;
-    case 96000: out[0] |= 0b00110000; break;
-    case 192000: out[0] |= 0b00110000; break;
-    default: out[0] |= 0b11110000; break;
+    case 8000: out[0]   |= 0b00010000; break;
+    case 16000: out[0]  |= 0b00100000; break;
+    case 22050: out[0]  |= 0b00110000; break;
+    case 44100: out[0]  |= 0b01000000; break;
+    case 48000: out[0]  |= 0b01010000; break;
+    case 96000: out[0]  |= 0b01100000; break;
+    case 192000: out[0] |= 0b01110000; break;
+    default: out[0]     |= 0b11110000; break;
   }
   // if(options.optWholeFileCompression == true) out[0] |= 0b1000;
   switch(options.compressionStrategy) {
